@@ -1,0 +1,14 @@
+[
+  {
+    "path": "docs/assets/dsh-payroll-audit-hero.png",
+    "kind": "hero",
+    "alt": "dsh-payroll-audit terminal output",
+    "caption": "Real dsh-payroll-audit checker output."
+  },
+  {
+    "path": "docs/assets/dsh-payroll-audit-demo.gif",
+    "kind": "demo",
+    "alt": "Animated dsh-payroll-audit terminal session",
+    "caption": "The same run, assembled line by line."
+  }
+]

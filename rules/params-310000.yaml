@@ -1,0 +1,158 @@
+schema: payroll-params/v1
+city_code: "310000"
+city_name: "上海"
+compiled_at: "2026-10-23"
+compiled_by: "manual"
+next_review_by: "2027-07-10"
+review_owner: "参数维护人（1 人）"
+
+# 上海的关键差异（写进参数库而不是代码里）：
+# 1) 公积金缴存比例上限是 7%，不是国家条例口径的 12%；另有补充公积金 1%~5%。
+# 2) 公积金基数上限恰好等于社保基数上限（37731），但下限是 2740，与社保 7546 无关。
+# 3) 社平工资 12577 元/月 是本年度上下限的推导依据，存下来用于解释"为什么是这个数"。
+
+base_limits:
+  - id: sh_si_2026
+    scope: social
+    applies_to: [pension, unemployment, injury, medical, maternity]
+    floor: 7546
+    ceiling: 37731
+    currency: CNY
+    derived_from: {statutory_avg_wage_monthly: 12577, rule: "floor=avg*0.6, ceiling=avg*3"}
+    valid_from: "2026-07-01"
+    valid_to: null
+    doc_no: "上海市人社局《本市调整2026年度社保缴费基数上下限》（2026-08-18）"
+    source_url: "https://rsj.sh.gov.cn/tgsgg_17341/20260818/t0035_1443203.html"
+    evidence_level: verbatim
+    retrieved_at: "2026-10-23"
+
+  - id: sh_hf_2026
+    scope: housing_fund
+    applies_to: [housing_fund, supplementary_housing_fund]
+    floor: 2740
+    ceiling: 37731
+    valid_from: "2026-07-01"
+    valid_to: "2027-06-30"
+    doc_no: "沪公积金管委会〔2026〕3号"
+    source_url: "https://www.shzfgjj.cn/html/newxxgk/zcwj/gwhwj/228478.html"
+    evidence_level: verbatim
+    retrieved_at: "2026-10-23"
+
+contributions:
+  - insurance: housing_fund
+    base_ref: sh_hf_2026
+    employee_rate_min: 0.05
+    employee_rate_max: 0.07
+    employer_rate_min: 0.05
+    employer_rate_max: 0.07
+    rate_kind: discretionary
+    rate_granularity: 0.01            # 取整数值，只能 5/6/7
+    employee_must_equal_employer: review
+    monthly_amount_cap_at_max_rate: 5282   # 7% 档对应的月缴存额上限（单位+个人合计）
+    rounding: round_half_up_to_yuan
+    valid_from: "2026-07-01"
+    valid_to: "2027-06-30"
+    cite: c_sh_hf
+
+  - insurance: supplementary_housing_fund
+    base_ref: sh_hf_2026
+    employee_rate_min: 0.01
+    employee_rate_max: 0.05
+    employer_rate_min: 0.01
+    employer_rate_max: 0.05
+    rate_kind: discretionary_optional   # 自愿参加，缺失不算错
+    rate_granularity: 0.01
+    rounding: round_half_up_to_yuan
+    valid_from: "2026-07-01"
+    valid_to: "2027-06-30"
+    cite: c_sh_hf
+
+  - insurance: pension
+    base_ref: sh_si_2026
+    employee_rate: 0.08
+    employer_rate: 0.16
+    rate_kind: fixed
+    rounding: round_half_up_to_fen
+    valid_from: "2026-07-01"
+    valid_to: null
+    cite: c_national_pension_rate
+
+pending:
+  - insurance: medical
+    reason: "上海职工医保单位/个人费率未取得官方原文"
+    blocks_checks: [r_si_06_medical_amount]
+  - insurance: unemployment
+    reason: "上海 2026 年失业保险费率（阶段性降费是否延续）未取得官方原文"
+    blocks_checks: [r_si_05_unemployment_rate]
+  - key: minimum_wage
+    reason: "上海 2026 年最低工资标准未单独核实"
+    blocks_checks: [r_pay_08_below_minimum_wage]
+
+
+# ── 个税（全国统一，与城市无关；北京/上海共用同一份数值）──────────────
+# 预扣率表一来自 国家税务总局公告2018年第61号 附件；月度税率表来自 财税〔2018〕164号 附件。
+# 两表数值本次未逐字抓取原文（evidence_level: paraphrase），发布前必须补引文。
+iit:
+  basic_deduction_monthly: 5000
+  withholding_table:
+    - {upper: 36000,    rate: 0.03, quick: 0}
+    - {upper: 144000,   rate: 0.10, quick: 2520}
+    - {upper: 300000,   rate: 0.20, quick: 16920}
+    - {upper: 420000,   rate: 0.25, quick: 31920}
+    - {upper: 660000,   rate: 0.30, quick: 52920}
+    - {upper: 960000,   rate: 0.35, quick: 85920}
+    - {upper: null,     rate: 0.45, quick: 181920}
+  bonus_monthly_table:
+    - {upper: 3000,     rate: 0.03, quick: 0}
+    - {upper: 12000,    rate: 0.10, quick: 210}
+    - {upper: 25000,    rate: 0.20, quick: 1410}
+    - {upper: 35000,    rate: 0.25, quick: 2660}
+    - {upper: 55000,    rate: 0.30, quick: 4410}
+    - {upper: 80000,    rate: 0.35, quick: 7160}
+    - {upper: null,     rate: 0.45, quick: 15160}
+  extra_deduction_caps:
+    child_edu_monthly_per_child: 2000        # 国发〔2023〕13号 verbatim
+    infant_care_monthly_per_child: 2000      # 国发〔2023〕13号 verbatim
+    elderly_support_monthly_max: 3000        # 国发〔2023〕13号 verbatim
+    elderly_support_non_only_max: 1500       # 国发〔2023〕13号 verbatim
+    housing_loan_interest_monthly: 1000      # 国发〔2018〕41号 paraphrase
+    housing_rent_monthly: {tier1: 1500, tier2: 1100, tier3: 800}   # paraphrase
+    continuing_edu_monthly: 400              # paraphrase
+    continuing_edu_annual: 3600              # paraphrase
+    serious_illness_annual_max: 80000        # paraphrase
+
+
+citations:
+  - id: c_sh_si_limit
+    source: "上海市人力资源和社会保障局《本市调整2026年度社保缴费基数上下限》"
+    locator: "正文第 1 段"
+    quote: "2026年7月1日起，本市社保缴费基数的上限调整为37731元/月，下限调整为7546元/月。本市2025年度全口径城镇单位就业人员平均工资为12577元/月。"
+    source_url: "https://rsj.sh.gov.cn/tgsgg_17341/20260818/t0035_1443203.html"
+    evidence_level: verbatim
+
+  - id: c_sh_hf
+    source: "上海市住房公积金管理委员会《关于2026年度上海市调整住房公积金缴存基数、比例以及月缴存额上下限的通知》沪公积金管委会〔2026〕3号"
+    locator: "第一条、第二条（一）（二）、第四条"
+    quote: "住房公积金缴存基数最高不超过37731元，最低不低于2740元。……单位和职工住房公积金缴存比例为各5%～7%（取整数值）。……补充住房公积金缴存比例为各1%～5%（取整数值）。……住房公积金缴存比例为各7%的，对应的住房公积金月缴存额上限为5282元。"
+    source_url: "https://www.shzfgjj.cn/html/newxxgk/zcwj/gwhwj/228478.html"
+    evidence_level: verbatim
+
+  - id: c_hf_national
+    source: "建设部、财政部、中国人民银行《关于住房公积金管理若干具体问题的指导意见》建金管〔2005〕5号"
+    locator: "第二条、第三条"
+    quote: "单位和职工缴存比例不应低于5％，原则上不高于12％。……缴存住房公积金的月工资基数，原则上不应超过职工工作地所在设区城市统计部门公布的上一年度职工月平均工资的2倍或3倍。具体标准由各地根据实际情况确定。"
+    source_url: "https://www.mohurd.gov.cn/gongkai/zc/wjk/art/2006/art_17339_157745.html"
+    evidence_level: verbatim
+
+  - id: c_national_pension_rate
+    source: "国务院办公厅《降低社会保险费率综合方案》国办发〔2019〕13号（未抓原文，按公开执行口径记录）"
+    locator: "降低养老保险单位缴费比例"
+    quote: "（paraphrase）企业职工基本养老保险单位缴费比例降至 16%，个人缴费比例 8%。"
+    source_url: "https://www.gov.cn/zhengce/content/2019-04/04/content_5379765.htm"
+    evidence_level: paraphrase      # 发布前必须补逐字引文；未补前该 cite 不得支撑 fail 结论
+  - id: c_iit_bracket
+    source: "国家税务总局公告2018年第61号 附件《个人所得税预扣率表一》、财税〔2018〕164号 附件《按月换算后的综合所得税率表》（数值本次未逐字抓取）"
+    locator: "附件"
+    quote: "（paraphrase）累计预扣预缴应纳税所得额 ≤36000 预扣率 3%、速算扣除数 0；36000~144000 为 10%/2520；144000~300000 为 20%/16920；300000~420000 为 25%/31920；420000~660000 为 30%/52920；660000~960000 为 35%/85920；>960000 为 45%/181920。"
+    source_url: "https://guangdong.chinatax.gov.cn/gdsw/zjfg/2018-12/22/content_9cdc1d9ad76540d7b8d6f989a7fcf095.shtml"
+    evidence_level: paraphrase

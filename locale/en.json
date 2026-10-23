@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Payroll audit",
+    "description": "按已核实的社保/公积金/个税参数核对工资表，逐条给出差异与依据，不代申报。"
+  }
+}

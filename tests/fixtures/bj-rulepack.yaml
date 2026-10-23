@@ -1,0 +1,412 @@
+schema: payroll-audit-rulepack/v1
+id: social-bj-2026
+title: "北京 2026 社保/公积金/个税 算薪核验"
+version: 0.1.0
+city_code: "110000"
+jurisdiction: "北京市"
+period_scope: ["2026-07-01", "2026-12-31"]
+description: |
+  读一张工资表（可选附带社保申报表、公积金清册），核对缴费基数、费率、险种、封顶、
+  勾稽与个税累计预扣。只输出差异供人复核，不代申报、不替代经办机构核定、不调用模型。
+
+  本 pack 的判定基准来自 params/cn/110000.yaml；参数缺失或未经核实（pending）时，
+  对应规则必须关闭并在报告的「参数缺口」中列出，禁止按 0 或按国家常数代入。
+
+params:
+  - file: ../../params/cn/110000.yaml
+    resolve_by: {city_code: "110000", period: "$row.period"}
+
+tolerance:
+  amount: 1.00                 # 金额类比对容差（元/人/月）
+  rate_check: strict           # 费率按金额倒推，不给容差以外的模糊
+  rounding_rule: round_half_up_to_fen
+
+# ── 派生字段：引擎扩展 #1（受限算术表达式，禁用 eval）─────────────────────
+# 语法：数值字面量 + 字段引用 + p('<param key>') + 函数 nz/min/max/abs/round/sum
+# 解析器约 250 行，白名单 AST，不接触宿主作用域。
+derived:
+  - {name: si_floor,             expr: "p('si.base.floor')"}
+  - {name: si_ceiling,           expr: "p('si.base.ceiling')"}
+  - {name: hf_floor,             expr: "p('hf.base.floor')"}
+  - {name: hf_rate_min,          expr: "p('hf.fund.employee_min')"}
+  - {name: hf_rate_max,          expr: "p('hf.fund.employee_max')"}
+  - {name: injury_rate_min,      expr: "p('si.injury.employer_min')"}
+  - {name: injury_rate_max,      expr: "p('si.injury.employer_max')"}
+  - {name: child_edu_cap,        expr: "p('iit.extra.child_edu_monthly')"}
+  - {name: hf_ceiling,           expr: "p('hf.base.ceiling')"}
+  # 费率校验的基数：只做上限封顶，不做下限托底。
+  # 下限违规由 r_si_01 单独报，若这里也托底，一个基数错误会被拆成"基数错+费率错"两条。
+  - {name: base_for_rate,        expr: "min(nz(base_declared), si_ceiling)"}
+  - {name: emp_pension_should,   expr: "round(base_for_rate * p('si.pension.employer'), 2)"}
+  - {name: ee_pension_should,    expr: "round(base_for_rate * p('si.pension.employee'), 2)"}
+  - {name: ee_unemp_should,      expr: "round(base_for_rate * p('si.unemployment.employee'), 2)"}
+  - {name: hf_emp_should,        expr: "round(min(hf_base, hf_ceiling) * hf_employer_rate, 2)"}
+  - {name: hf_ee_should,         expr: "round(min(hf_base, hf_ceiling) * hf_employee_rate, 2)"}
+  - {name: ee_deduction_should,  expr: "round(nz(ee_pension_should) + nz(ee_unemp_should) + nz(ee_medical) + nz(ee_hf) + nz(ee_hf_supp) + nz(ee_injury), 2)"}
+  - {name: net_should,           expr: "round(nz(gross_pay) - nz(ee_deduction_should) - nz(iit_withheld) - nz(other_deduction), 2)"}
+  - {name: net_delta,            expr: "round(nz(net_pay) - net_should, 2)"}
+  - {name: pension_emp_delta,    expr: "round(nz(employer_pension) - emp_pension_should, 2)"}
+  - {name: pension_ee_delta,     expr: "round(nz(employee_pension) - ee_pension_should, 2)"}
+  - {name: abs_pension_emp_delta, expr: "abs(pension_emp_delta)"}
+  - {name: abs_hf_emp_delta,     expr: "abs(round(nz(ee_hf) - hf_ee_should, 2))"}
+  # 加班费：月计薪天数 21.75（劳社部发〔2008〕3号），基数取合同约定正常工作时间工资
+  - {name: overtime_should,      expr: "round(nz(overtime_base) / 21.75 / 8 * nz(overtime_multiplier) * nz(overtime_hours), 2)"}
+  - {name: overtime_delta,       expr: "round(nz(overtime_should) - nz(overtime_pay), 2)"}
+  # 个税累计预扣（仅在累计列齐备时可用，见 coverage C_IIT）
+  - {name: iit_taxable_cum,      expr: "max(0, nz(cum_income) - nz(cum_exempt) - nz(cum_basic_deduction) - nz(cum_special_deduction) - nz(cum_extra_deduction) - nz(cum_other_deduction))"}
+  - {name: iit_due_cum,          expr: "round(iit_taxable_cum * bracket_rate(iit_taxable_cum, 'iit.withholding') - bracket_quick(iit_taxable_cum, 'iit.withholding'), 2)"}
+  - {name: iit_should_withhold,  expr: "max(0, round(iit_due_cum - nz(cum_tax_paid), 2))"}
+  - {name: iit_delta,            expr: "round(nz(iit_withheld) - iit_should_withhold, 2)"}
+
+input_schema:
+  type: object
+  required: [employee_id, city_code, period, base_declared]
+  properties:
+    employee_id: {type: string}
+    employee_name: {type: string}
+    person_type: {type: string, enum: [regular, dispatch, rehired_retiree, intern, part_time, foreign]}
+    city_code: {type: string}
+    period: {type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"}
+    base_declared: {type: number, description: "申报的社保缴费基数（元/月），不是当月应发"}
+    hf_base: {type: number}
+    hf_employer_rate: {type: number}
+    hf_employee_rate: {type: number}
+    insurance_set: {type: array, items: {type: string}}
+    gross_pay: {type: number}
+    net_pay: {type: number}
+    employer_pension: {type: number}
+    employee_pension: {type: number}
+    ee_medical: {type: number}
+    ee_unemployment: {type: number}
+    ee_injury: {type: number}
+    ee_hf: {type: number}
+    ee_hf_supp: {type: number}
+    iit_withheld: {type: number}
+    other_deduction: {type: number}
+    employer_injury_rate: {type: number, description: "单位工伤费率，0~1 小数"}
+    overtime_hours: {type: number}
+    overtime_base: {type: number, description: "加班费计算基数（合同约定的正常工作时间工资）"}
+    overtime_multiplier: {type: number, enum: [1.5, 2, 3]}
+    overtime_pay: {type: number}
+    child_edu_deduction: {type: number, description: "本月子女教育扣除合计"}
+    prior_base: {type: number, description: "1~6 月使用的旧申报基数，用于补差核对"}
+    months_at_prior_base: {type: integer}
+    cum_income: {type: number}
+    cum_exempt: {type: number}
+    cum_basic_deduction: {type: number}
+    cum_special_deduction: {type: number}
+    cum_extra_deduction: {type: number}
+    cum_other_deduction: {type: number}
+    cum_tax_paid: {type: number}
+
+citations:
+  - id: c_bj_si_limit
+    source: "北京市人社局等《关于2026年度各项社会保险缴费工资基数上下限的通告》政策解读"
+    locator: "正文第 2 段"
+    quote: "从2026年7月起，凡在本市参保的职工基本养老保险、失业保险、工伤保险、职工基本医疗保险（含生育保险）的月缴费基数上限为36348元，下限为7270元。"
+    source_url: "https://www.beijing.gov.cn/zhengce/zcjd/202608/t20260821_4831683.html"
+    evidence_level: verbatim
+
+  - id: c_bj_rate_social
+    source: "北京人社公众号（房山区政府网站转载，2026-08-27）"
+    locator: "正文第 2–4 段"
+    quote: "养老保险：单位缴费比例为16%，个人缴费比例为8%。失业保险：单位、个人缴费比例均为0.5%。工伤保险：缴费完全由用人单位负担，根据企业所属行业风险实行0.2%至1.9%浮动费率，职工不承担工伤保险费用。"
+    source_url: "https://www.bjfsh.gov.cn/zsk/zcwd/202608/t20260818_40116625_fs.shtml"
+    evidence_level: verbatim_secondary
+
+  - id: c_bj_hf
+    source: "京房公积金管委会办〔2026〕6号"
+    locator: "第一条、第二条"
+    quote: "2026住房公积金年度继续执行5%至12%的缴存比例政策。……月缴存基数上限为36348元……月缴存基数下限为2540元，与2025年度保持一致。"
+    source_url: "https://gjj.beijing.gov.cn/web/zwgk61/2024zcwj/436433461/744103382/index.html"
+    evidence_level: verbatim
+
+  - id: c_iit_61
+    source: "国家税务总局公告2018年第61号《个人所得税扣缴申报管理办法（试行）》"
+    locator: "第六条"
+    quote: "本期应预扣预缴税额=（累计预扣预缴应纳税所得额×预扣率-速算扣除数)-累计减免税额-累计已预扣预缴税额……累计减除费用，按照5000元/月乘以纳税人当年截至本月在本单位的任职受雇月份数计算。"
+    source_url: "https://guangdong.chinatax.gov.cn/gdsw/zjfg/2018-12/22/content_9cdc1d9ad76540d7b8d6f989a7fcf095.shtml"
+    evidence_level: verbatim
+
+  - id: c_iit_special
+    source: "国发〔2023〕13号《国务院关于提高个人所得税有关专项附加扣除标准的通知》"
+    locator: "第一、二、三条"
+    quote: "3岁以下婴幼儿照护……由每个婴幼儿每月1000元提高到2000元。子女教育……由每个子女每月1000元提高到2000元。赡养老人……由每月2000元提高到3000元。其中，独生子女按照每月3000元的标准定额扣除；非独生子女与兄弟姐妹分摊每月3000元的扣除额度，每人分摊的额度不能超过每月1500元。"
+    source_url: "https://www.gov.cn/zhengce/zhengceku/202308/content_6901207.htm"
+    evidence_level: verbatim
+
+  - id: c_labor_44
+    source: "《中华人民共和国劳动法》第四十四条（本次未抓原文，按公开条文记录）"
+    locator: "第四十四条"
+    quote: "（paraphrase）安排延长工作时间的支付不低于工资的 150%；休息日安排工作又不能补休的不低于 200%；法定休假日安排工作的不低于 300%。"
+    source_url: "https://www.gov.cn/banshi/2005-05/25/content_905.htm"
+    evidence_level: paraphrase      # 发布前补逐字引文；未补前只能支撑 review，不能支撑 fail
+
+  - id: c_labor_2175
+    source: "劳社部发〔2008〕3号《关于职工全年月平均工作时间和工资折算问题的通知》（未抓原文，按公开口径记录）"
+    locator: "月计薪天数"
+    quote: "（paraphrase）月计薪天数 = (365 - 104) ÷ 12 = 21.75 天。"
+    source_url: "https://www.gov.cn/zwgk/2008-01/10/content_855099.htm"
+    evidence_level: paraphrase
+
+# ── 输入模式：决定"最少要查到什么"，以及 verdict 的上限 ──────────────────
+# 用户只给申报表时，可以给出"未发现差异"，但只能到 pass_with_gaps，
+# 永远到不了 pass —— 这是"不许把没查当成通过"的实现层保障。
+modes:
+  M1_declaration_only:
+    label: "仅社保/公积金申报表"
+    detected_when: [base_declared]
+    required_coverage: [C_SI_BASE, C_SI_RATE, C_SI_SET]
+    verdict_cap: pass_with_gaps
+  M2_payroll:
+    label: "工资表（含社保公积金明细）"
+    detected_when: [gross_pay, net_pay]
+    required_coverage: [C_SI_BASE, C_SI_RATE, C_SI_SET, C_HF, C_PAY_NET]
+    verdict_cap: pass
+  M3_full:
+    label: "工资表 + 个税累计列"
+    detected_when: [cum_income, cum_tax_paid]
+    required_coverage: [C_SI_BASE, C_SI_RATE, C_SI_SET, C_HF, C_PAY_NET, C_IIT]
+    verdict_cap: pass
+
+# ── 覆盖率声明：报告据此计算「本次没查什么」────────────────────────────
+# requires 里的字段任一缺失 → 该覆盖项状态为 unchecked（不是 pass）。
+coverage:
+  - {id: C_SI_BASE,    title: 社保基数上下限,     requires: [base_declared, city_code, period]}
+  - {id: C_SI_RATE,    title: 养老/失业费率与金额, requires: [base_declared, employer_pension, employee_pension]}
+  - {id: C_SI_SET,     title: 险种齐全性与个人不缴项, requires: [insurance_set]}
+  - {id: C_HF,         title: 公积金基数与比例,   requires: [hf_base, hf_employer_rate, hf_employee_rate]}
+  - {id: C_PAY_NET,    title: 应发/扣款/实发勾稽,  requires: [gross_pay, net_pay]}
+  - {id: C_IIT,        title: 个税累计预扣重算,   requires: [cum_income, cum_basic_deduction, cum_special_deduction, cum_tax_paid]}
+  - {id: C_CROSS,      title: 社保/个税/工资三方人数与总额比对, requires: [sheet.social_declaration, sheet.iit_declaration], optional: true}
+  - {id: C_RETRO,      title: 7 月调基补差,       requires: [prior_base, months_at_prior_base], optional: true}
+
+rules:
+  # ══ 社保基数 ═══════════════════════════════════════════════════════
+  - id: r_si_01_base_below_floor
+    when:
+      all_of:
+        - {field: base_declared, op: exists}
+        - {field: base_declared, op: "<", ref: si_floor}
+        - {field: person_type, op: "not_in", value: [rehired_retiree, intern]}
+    then: {verdict: fail, severity: P0, reason_code: SI_BASE_BELOW_FLOOR, cite: [c_bj_si_limit]}
+    impact:
+      expr: "round((si_floor - base_declared) * (p('si.pension.employer') + p('si.pension.employee') + 2 * p('si.unemployment.employee')), 2)"
+      unit: CNY/month
+      excludes: ["medical（费率未核实）", "housing_fund（基数另有上下限）"]
+    require_fields: [base_declared]
+    note: |
+      退休返聘、实习生通常不参加职工社保（按当地口径），排除以免误报。
+      非全日制用工只强制工伤，也应单列 person_type —— 这是本规则最大的假阳性来源。
+
+  - id: r_si_02_base_above_ceiling_uncapped
+    when:
+      all_of:
+        - {field: base_declared, op: ">", ref: si_ceiling}
+        - {field: pension_emp_delta, op: ">", value: 1.00}
+    then: {verdict: fail, severity: P1, reason_code: SI_BASE_ABOVE_CEILING_UNCAPPED, cite: [c_bj_si_limit]}
+    impact: {expr: "pension_emp_delta", unit: CNY/month}
+    require_fields: [base_declared, employer_pension]
+    note: "申报基数高于上限且按原基数缴费 = 未封顶，多缴的部分单位可退，但更重要的是申报口径错了。"
+
+  - id: r_si_02p_base_above_ceiling_capped_ok
+    when:
+      all_of:
+        - {field: base_declared, op: ">", ref: si_ceiling}
+        - {field: abs_pension_emp_delta, op: "<=", value: 1.00}
+    then: {verdict: pass, severity: P3, reason_code: SI_BASE_CAPPED_OK, cite: [c_bj_si_limit]}
+    require_fields: [base_declared, employer_pension]
+    note: |
+      **显式 pass，不要依赖"未匹配即通过"**。高薪员工基数 = 上限是常态，
+      若只写 fail 规则，这些人会落到 NO_RULE_MATCHED → review，报告立刻被"待确认"淹没。
+
+  # ══ 社保费率（按金额倒推，不看用户填的"比例"字段）═══════════════════
+  - id: r_si_03_pension_employer_mismatch
+    when:
+      all_of:
+        - {field: employer_pension, op: exists}
+        - {field: base_declared, op: ">=", ref: si_floor}
+        - {field: base_declared, op: "<=", ref: si_ceiling}
+        - any_of:
+            - {field: pension_emp_delta, op: ">", value: 1.00}
+            - {field: pension_emp_delta, op: "<", value: -1.00}
+    then: {verdict: fail, severity: P0, reason_code: SI_PENSION_EMPLOYER_MISMATCH, cite: [c_bj_rate_social, c_bj_si_limit]}
+    impact: {expr: "pension_emp_delta", unit: CNY/month}
+    require_fields: [employer_pension, base_declared]
+    note: "用金额倒推费率，比读用户填的'比例'列可靠：多数工资表根本没有比例列。"
+
+  - id: r_si_04_pension_employee_mismatch
+    when:
+      all_of:
+        - {field: employee_pension, op: exists}
+        - {field: base_declared, op: ">=", ref: si_floor}
+        - {field: base_declared, op: "<=", ref: si_ceiling}
+        - any_of:
+            - {field: pension_ee_delta, op: ">", value: 1.00}
+            - {field: pension_ee_delta, op: "<", value: -1.00}
+    then: {verdict: fail, severity: P0, reason_code: SI_PENSION_EMPLOYEE_MISMATCH, cite: [c_bj_rate_social]}
+    impact: {expr: "pension_ee_delta", unit: CNY/month}
+    require_fields: [employee_pension, base_declared]
+
+  - id: r_si_05_unemployment_mismatch
+    when:
+      all_of:
+        - {field: ee_unemployment, op: exists}
+        - {field: base_declared, op: ">=", ref: si_floor}
+        - {field: base_declared, op: "<=", ref: si_ceiling}
+        - {field: ee_unemployment, op: "!=", ref: ee_unemp_should, tol: 1.00}
+    then: {verdict: fail, severity: P0, reason_code: SI_UNEMPLOYMENT_MISMATCH, cite: [c_bj_rate_social]}
+    require_fields: [ee_unemployment]
+    enabled: true
+
+  # ══ 险种齐全性（只看有无，不依赖未核实的费率，所以可以先上线）══════
+  - id: r_si_08_insurance_missing
+    when:
+      all_of:
+        - {field: insurance_set, op: exists}
+        - {field: insurance_set, op: not_superset, value: [pension, unemployment, injury, medical]}
+    then: {verdict: fail, severity: P0, reason_code: SI_INSURANCE_MISSING, cite: [c_bj_si_limit]}
+    require_fields: [insurance_set]
+    note: |
+      少工伤险 → 发生工伤时单位全额承担待遇；少医疗险 → 员工门诊住院全部自费并可能追溯补缴。
+      这一条不需要任何费率参数，是首发版本里性价比最高、误报最低的规则。
+
+  - id: r_si_09_injury_employee_charged
+    when:
+      all_of:
+        - {field: ee_injury, op: ">", value: 0.01}
+    then: {verdict: fail, severity: P0, reason_code: SI_INJURY_EMPLOYEE_CHARGED, cite: [c_bj_rate_social]}
+    require_fields: [ee_injury]
+    note: "工伤个人不缴。个人栏出现金额 = 违法克扣工资，金额再小也是 P0（会重复发生）。"
+
+  - id: r_si_10_injury_employer_out_of_range
+    when:
+      all_of:
+        - {field: employer_injury_rate, op: exists}
+        - any_of:
+            - {field: employer_injury_rate, op: "<", ref: injury_rate_min}
+            - {field: employer_injury_rate, op: ">", ref: injury_rate_max}
+    then: {verdict: fail, severity: P1, reason_code: SI_INJURY_RATE_OUT_OF_RANGE, cite: [c_bj_rate_social]}
+    require_fields: [employer_injury_rate]
+    note: "只校验 0.2%~1.9% 区间；具体档次（八类行业）参数未入库，不能判'档次选错'。"
+
+  # ══ 公积金 ═════════════════════════════════════════════════════════
+  - id: r_hf_01_rate_out_of_range
+    when:
+      all_of:
+        - {field: hf_employee_rate, op: exists}
+        - any_of:
+            - {field: hf_employee_rate, op: "<", ref: hf_rate_min}
+            - {field: hf_employee_rate, op: ">", ref: hf_rate_max}
+    then: {verdict: fail, severity: P0, reason_code: HF_RATE_OUT_OF_RANGE, cite: [c_bj_hf]}
+    impact:
+      expr: "round((hf_employee_rate - hf_rate_max) * min(nz(hf_base), hf_ceiling) * 2, 2)"
+      unit: CNY/month
+      applies_when: "rate above max; below-min case impact is negative"
+    require_fields: [hf_employee_rate]
+    note: |
+      北京是 5%~12%，上海是 5%~7%。比例区间必须来自参数库，
+      硬编码国家条例的 5%~12% 会在上海放过 8%~12% 的违规缴存（见验收用例 3）。
+
+  - id: r_hf_02_base_above_ceiling
+    when:
+      all_of:
+        - {field: hf_base, op: ">", ref: hf_ceiling}
+        - {field: abs_hf_emp_delta, op: ">", value: 1.00}
+    then: {verdict: fail, severity: P1, reason_code: HF_BASE_ABOVE_CEILING, cite: [c_bj_hf]}
+    impact: {expr: "round(nz(hf_base) - hf_ceiling, 2)", unit: CNY, kind: base_excess}
+    require_fields: [hf_base, ee_hf]
+
+  - id: r_hf_03_party_ratio_unequal
+    when:
+      all_of:
+        - {field: hf_employer_rate, op: exists}
+        - {field: hf_employee_rate, op: exists}
+        - {field: hf_employer_rate, op: "!=", value: "$hf_employee_rate"}
+    then: {verdict: review, severity: P2, reason_code: HF_PARTY_RATIO_UNEQUAL, cite: [c_bj_hf]}
+    require_fields: [hf_employer_rate, hf_employee_rate]
+    note: |
+      官方原文只说"单位可自主确定比例"，未逐字规定单位与个人必须一致。
+      因此判 review 而不是 fail —— 拿不准的合规判断不要写成 fail，这是本产品最重要的自律。
+
+  # ══ 工资表勾稽 ═════════════════════════════════════════════════════
+  - id: r_pay_01_net_pay_mismatch
+    when:
+      all_of:
+        - {field: gross_pay, op: exists}
+        - {field: net_pay, op: exists}
+        - any_of:
+            - {field: net_delta, op: ">", value: 1.00}
+            - {field: net_delta, op: "<", value: -1.00}
+    then: {verdict: fail, severity: P0, reason_code: NET_PAY_MISMATCH, cite: [c_iit_61], detail_ref: net_explain}
+    impact: {expr: "net_delta", unit: CNY/month}
+    require_fields: [gross_pay, net_pay]
+    note: "实发对不上是员工投诉第一来源，且当月就会爆，所以 P0。"
+
+  - id: r_pay_02_overtime_rate_wrong
+    when:
+      all_of:
+        - {field: overtime_hours, op: ">", value: 0}
+        - {field: overtime_pay, op: exists}
+        - {field: overtime_delta, op: ">", value: 1.00}
+    then: {verdict: fail, severity: P1, reason_code: OT_PAY_BELOW_STATUTORY, cite: [c_labor_44]}
+    require_fields: [overtime_hours, overtime_pay, overtime_base]
+    note: "倍数与基数都来自劳动法 44 条；基数低于合同约定工资时另算一条。"
+
+  # ══ 个税（只有累计列齐备才启用）════════════════════════════════════
+  - id: r_iit_01_cumulative_mismatch
+    when:
+      all_of:
+        - {field: cum_income, op: exists}
+        - {field: cum_tax_paid, op: exists}
+        - any_of:
+            - {field: iit_delta, op: ">", value: 1.00}
+            - {field: iit_delta, op: "<", value: -1.00}
+    then: {verdict: fail, severity: P1, reason_code: IIT_CUMULATIVE_MISMATCH, cite: [c_iit_61], detail_ref: iit_explain}
+    impact: {expr: "iit_delta", unit: CNY/month}
+    require_fields: [cum_income, cum_basic_deduction, cum_special_deduction, cum_tax_paid, iit_withheld]
+    note: "累计减除费用 = 5000 × 本单位任职月份数，不是 5000，也不是 5000×12。"
+
+  - id: r_iit_02_special_deduction_over_cap
+    when:
+      all_of:
+        - {field: child_edu_deduction, op: ">", ref: child_edu_cap}
+    then: {verdict: fail, severity: P1, reason_code: IIT_DEDUCTION_OVER_CAP, cite: [c_iit_special]}
+    require_fields: [child_edu_deduction]
+    note: "子女教育 2000 元/人/月；赡养老人独生 3000、非独生每人≤1500。"
+
+  # ══ 显式放行（照抄"不要依赖聚合"的教训）══════════════════════════
+  - id: r_pass_all_checked
+    when:
+      all_of:
+        - {field: base_declared, op: exists}
+        - {field: base_declared, op: ">=", ref: si_floor}
+        - any_of:
+            # M1：只有申报表，没有工资明细 → 只声明"已核验范围内未发现差异"
+            - {field: gross_pay, op: absent}
+            # M2/M3：有工资明细 → 勾稽与费率都必须对得上
+            - all_of:
+                - {field: net_delta, op: "<", value: 1.00}
+                - {field: net_delta, op: ">", value: -1.00}
+                - any_of:
+                    - {field: employer_pension, op: absent}
+                    - all_of:
+                        - {field: pension_emp_delta, op: "<", value: 1.00}
+                        - {field: pension_emp_delta, op: ">", value: -1.00}
+    then: {verdict: pass, severity: P3, reason_code: NO_DISCREPANCY_FOUND, cite: [c_bj_si_limit, c_bj_rate_social]}
+    require_fields: [base_declared]
+    note: |
+      措辞是 NO_DISCREPANCY_FOUND（未发现差异），不是 COMPLIANT（合规）。
+      报告文案必须与 verdict 同源：pass 只能对应"已核验项未发现差异"。
+
+# ── 因参数未核实而关闭的规则：必须出现在报告「参数缺口」中 ──────────
+disabled_rules:
+  - id: r_si_06_medical_amount
+    reason: "北京职工医保费率未核实"
+    unblock_by: "北京市医保局官方文件或 12333 书面口径"
+  - id: r_si_07_injury_rate_tier
+    reason: "行业八类费率档次表未入库"
+    unblock_by: "《工伤保险行业风险分类表》+ 北京浮动费率办法"
+  - id: r_pay_08_below_minimum_wage
+    reason: "北京 2026 最低工资标准未取得独立文件"
+    unblock_by: "北京市人社局最低工资调整通知"

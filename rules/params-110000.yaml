@@ -1,0 +1,162 @@
+schema: payroll-params/v1
+city_code: "110000"
+city_name: "北京"
+compiled_at: "2026-10-23"
+compiled_by: "manual"
+next_review_by: "2027-07-10"          # 次年 7 月新基数通告发布后 10 日内必须复核
+review_owner: "参数维护人（1 人）"
+
+# 口径：北京五险（养老/失业/工伤/医疗含生育）共用同一套缴费基数上下限。
+# 生效：2026-07-01 起。2025 年度（2025-07-01 ~ 2026-06-30）的基数本库尚未收录，
+# 因此 2026-01 ~ 2026-06 的工资表会命中 PARAM_MISSING 并降级为 review —— 这是刻意的失败关闭。
+
+base_limits:
+  - id: bj_si_2026
+    scope: social
+    applies_to: [pension, unemployment, injury, medical, maternity]
+    floor: 7270
+    ceiling: 36348
+    currency: CNY
+    valid_from: "2026-07-01"
+    valid_to: null
+    doc_no: "关于2026年度各项社会保险缴费工资基数上下限的通告（2026-08-21 发布）"
+    source_url: "https://rsj.beijing.gov.cn/xxgk/2024zcwj/202608/t20260821_4831461.html"
+    source_url_alt: "https://www.beijing.gov.cn/zhengce/zcjd/202608/t20260821_4831683.html"
+    evidence_level: verbatim
+    retrieved_at: "2026-10-23"
+
+  - id: bj_hf_2026
+    scope: housing_fund
+    applies_to: [housing_fund]
+    floor: 2540
+    ceiling: 36348
+    notes: "下限与 2025 年度一致；领取基本生活费职工月缴存基数下限为 1778 元，需单独参数键"
+    valid_from: "2026-07-01"
+    valid_to: "2027-06-30"
+    doc_no: "京房公积金管委会办〔2026〕6号"
+    source_url: "https://gjj.beijing.gov.cn/web/zwgk61/2024zcwj/436433461/744103382/index.html"
+    evidence_level: verbatim
+    retrieved_at: "2026-10-23"
+
+contributions:
+  - insurance: pension
+    base_ref: bj_si_2026
+    employee_rate: 0.08
+    employer_rate: 0.16
+    rate_kind: fixed
+    rounding: round_half_up_to_fen
+    valid_from: "2026-07-01"
+    valid_to: null
+    cite: c_bj_rate_social
+
+  - insurance: unemployment
+    base_ref: bj_si_2026
+    employee_rate: 0.005
+    employer_rate: 0.005
+    rate_kind: fixed
+    rounding: round_half_up_to_fen
+    valid_from: "2026-07-01"
+    valid_to: null
+    cite: c_bj_rate_social
+
+  - insurance: injury
+    base_ref: bj_si_2026
+    employee_rate: 0.0
+    employer_rate_min: 0.002
+    employer_rate_max: 0.019
+    rate_kind: industry_float       # 按行业风险类别浮动，单位取值必须落在区间内
+    rounding: round_half_up_to_fen
+    valid_from: "2026-07-01"
+    valid_to: null
+    cite: c_bj_rate_social
+
+  - insurance: housing_fund
+    base_ref: bj_hf_2026
+    employee_rate_min: 0.05
+    employee_rate_max: 0.12
+    employer_rate_min: 0.05
+    employer_rate_max: 0.12
+    rate_kind: discretionary       # 单位在区间内自选，统一年度内不变
+    employee_must_equal_employer: review   # 官方原文未逐字规定"必须同比例"，只能提示
+    rounding: round_half_up_to_yuan
+    valid_from: "2026-07-01"
+    valid_to: "2027-06-30"
+    cite: c_bj_hf
+
+# 已确认存在、但本次未从一手原文核实到费率的险种。引擎必须据此关闭对应规则，
+# 并在报告「参数缺口」中列出，不得静默按 0 处理。
+pending:
+  - insurance: medical
+    reason: "北京职工医保单位/个人费率未取得官方原文（房山区问答只列养老/失业/工伤三险）"
+    blocks_checks: [r_si_06_medical_amount]
+  - insurance: maternity
+    reason: "北京生育保险已并入职工医保，费率口径随医保，未单独核实"
+    blocks_checks: [r_si_06_maternity_amount]
+  - insurance: injury
+    reason: "行业浮动费率的具体档次表（0.2%~1.9% 八类）未取得，只能校验区间不能校验档次"
+    blocks_checks: [r_si_07_injury_rate_tier]
+  - key: minimum_wage
+    reason: "北京 2026 年最低工资标准未取得独立文件；公积金基数下限 2540 不等于最低工资"
+    blocks_checks: [r_pay_08_below_minimum_wage]
+
+
+# ── 个税（全国统一，与城市无关；北京/上海共用同一份数值）──────────────
+# 预扣率表一来自 国家税务总局公告2018年第61号 附件；月度税率表来自 财税〔2018〕164号 附件。
+# 两表数值本次未逐字抓取原文（evidence_level: paraphrase），发布前必须补引文。
+iit:
+  basic_deduction_monthly: 5000
+  withholding_table:
+    - {upper: 36000,    rate: 0.03, quick: 0}
+    - {upper: 144000,   rate: 0.10, quick: 2520}
+    - {upper: 300000,   rate: 0.20, quick: 16920}
+    - {upper: 420000,   rate: 0.25, quick: 31920}
+    - {upper: 660000,   rate: 0.30, quick: 52920}
+    - {upper: 960000,   rate: 0.35, quick: 85920}
+    - {upper: null,     rate: 0.45, quick: 181920}
+  bonus_monthly_table:
+    - {upper: 3000,     rate: 0.03, quick: 0}
+    - {upper: 12000,    rate: 0.10, quick: 210}
+    - {upper: 25000,    rate: 0.20, quick: 1410}
+    - {upper: 35000,    rate: 0.25, quick: 2660}
+    - {upper: 55000,    rate: 0.30, quick: 4410}
+    - {upper: 80000,    rate: 0.35, quick: 7160}
+    - {upper: null,     rate: 0.45, quick: 15160}
+  extra_deduction_caps:
+    child_edu_monthly_per_child: 2000        # 国发〔2023〕13号 verbatim
+    infant_care_monthly_per_child: 2000      # 国发〔2023〕13号 verbatim
+    elderly_support_monthly_max: 3000        # 国发〔2023〕13号 verbatim
+    elderly_support_non_only_max: 1500       # 国发〔2023〕13号 verbatim
+    housing_loan_interest_monthly: 1000      # 国发〔2018〕41号 paraphrase
+    housing_rent_monthly: {tier1: 1500, tier2: 1100, tier3: 800}   # paraphrase
+    continuing_edu_monthly: 400              # paraphrase
+    continuing_edu_annual: 3600              # paraphrase
+    serious_illness_annual_max: 80000        # paraphrase
+
+
+citations:
+  - id: c_bj_si_limit
+    source: "北京市人社局等《关于2026年度各项社会保险缴费工资基数上下限的通告》政策解读（首都之窗）"
+    locator: "正文第 2 段"
+    quote: "从2026年7月起，凡在本市参保的职工基本养老保险、失业保险、工伤保险、职工基本医疗保险（含生育保险）的月缴费基数上限为36348元，下限为7270元。"
+    source_url: "https://www.beijing.gov.cn/zhengce/zcjd/202608/t20260821_4831683.html"
+    evidence_level: verbatim
+
+  - id: c_bj_rate_social
+    source: "北京人社公众号（房山区政府网站 2026-08-27 转载）《本市城镇职工社保缴费比例是多少？》"
+    locator: "正文第 2–4 段"
+    quote: "养老保险：单位缴费比例为16%，个人缴费比例为8%。失业保险：单位、个人缴费比例均为0.5%。工伤保险：缴费完全由用人单位负担，根据企业所属行业风险实行0.2%至1.9%浮动费率，职工不承担工伤保险费用。"
+    source_url: "https://www.bjfsh.gov.cn/zsk/zcwd/202608/t20260818_40116625_fs.shtml"
+    evidence_level: verbatim_secondary   # 政府网站转载的官方公众号内容，非委办局红头文件
+
+  - id: c_bj_hf
+    source: "北京住房公积金管理委员会办公室《关于2026住房公积金年度缴存有关问题的通知》京房公积金管委会办〔2026〕6号"
+    locator: "第一条、第二条"
+    quote: "2026住房公积金年度继续执行5%至12%的缴存比例政策。……2026住房公积金年度住房公积金月缴存基数上限为36348元……月缴存基数下限为2540元，与2025年度保持一致，领取基本生活费职工的月缴存基数下限为1778元。"
+    source_url: "https://gjj.beijing.gov.cn/web/zwgk61/2024zcwj/436433461/744103382/index.html"
+    evidence_level: verbatim
+  - id: c_iit_bracket
+    source: "国家税务总局公告2018年第61号 附件《个人所得税预扣率表一》、财税〔2018〕164号 附件《按月换算后的综合所得税率表》（数值本次未逐字抓取）"
+    locator: "附件"
+    quote: "（paraphrase）累计预扣预缴应纳税所得额 ≤36000 预扣率 3%、速算扣除数 0；36000~144000 为 10%/2520；144000~300000 为 20%/16920；300000~420000 为 25%/31920；420000~660000 为 30%/52920；660000~960000 为 35%/85920；>960000 为 45%/181920。"
+    source_url: "https://guangdong.chinatax.gov.cn/gdsw/zjfg/2018-12/22/content_9cdc1d9ad76540d7b8d6f989a7fcf095.shtml"
+    evidence_level: paraphrase

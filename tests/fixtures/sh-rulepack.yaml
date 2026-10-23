@@ -1,0 +1,203 @@
+schema: payroll-audit-rulepack/v1
+id: social-sh-2026
+title: "上海 2026 社保/公积金 算薪核验（v0.1，仅覆盖已核实项）"
+version: 0.1.0
+city_code: "310000"
+jurisdiction: "上海市"
+period_scope: ["2026-07-01", "2026-12-31"]
+description: |
+  上海首版。与北京 pack 共用同一套判定语义与派生字段约定，差异全部来自 params/310000.yaml。
+
+  刻意不做的事：养老/失业/医疗费率判定在引文补齐前关闭。这不是缩水，而是证据等级策略：
+  paraphrase 级引文不足以支撑一个"你算错了"的结论（见 SPEC §7.2）。
+
+params:
+  - file: ../../params/cn/310000.yaml
+    resolve_by: {city_code: "310000", period: "$row.period"}
+
+tolerance:
+  amount: 1.00
+  rounding_rule: round_half_up_to_fen
+
+derived:
+  - {name: si_floor,        expr: "p('si.base.floor')"}
+  - {name: si_ceiling,      expr: "p('si.base.ceiling')"}
+  - {name: hf_floor,        expr: "p('hf.base.floor')"}
+  - {name: hf_ceiling,      expr: "p('hf.base.ceiling')"}
+  - {name: hf_rate_min,     expr: "p('hf.fund.employee_min')"}
+  - {name: hf_rate_max,     expr: "p('hf.fund.employee_max')"}
+  - {name: sup_rate_min,    expr: "p('hf.supplementary_housing_fund.employee_min')"}
+  - {name: sup_rate_max,    expr: "p('hf.supplementary_housing_fund.employee_max')"}
+  - {name: hf_ee_should,    expr: "round(min(nz(hf_base), hf_ceiling) * nz(hf_employee_rate), 2)"}
+  - {name: abs_hf_ee_delta, expr: "abs(round(nz(ee_hf) - hf_ee_should, 2))"}
+  - {name: ee_deduction_should, expr: "round(nz(employee_pension) + nz(ee_medical) + nz(ee_unemployment) + nz(ee_injury) + nz(ee_hf) + nz(ee_hf_supp) + nz(ee_supp_hf), 2)"}
+  - {name: net_should,      expr: "round(nz(gross_pay) - ee_deduction_should - nz(iit_withheld) - nz(other_deduction), 2)"}
+  - {name: net_delta,       expr: "round(nz(net_pay) - net_should, 2)"}
+
+input_schema:
+  type: object
+  required: [employee_id, city_code, period]
+  properties:
+    employee_id: {type: string}
+    city_code: {type: string}
+    period: {type: string}
+    person_type: {type: string, enum: [regular, dispatch, rehired_retiree, intern, part_time, foreign]}
+    base_declared: {type: number}
+    hf_base: {type: number}
+    hf_employee_rate: {type: number}
+    hf_employer_rate: {type: number}
+    supp_hf_employee_rate: {type: number}
+    insurance_set: {type: array, items: {type: string}}
+    gross_pay: {type: number}
+    net_pay: {type: number}
+    employee_pension: {type: number}
+    ee_medical: {type: number}
+    ee_unemployment: {type: number}
+    ee_injury: {type: number}
+    ee_hf: {type: number}
+    ee_hf_supp: {type: number}
+    ee_supp_hf: {type: number}
+    iit_withheld: {type: number}
+    other_deduction: {type: number}
+    prior_base: {type: number}
+    months_at_prior_base: {type: integer}
+    cum_income: {type: number}
+    cum_tax_paid: {type: number}
+
+citations:
+  - id: c_sh_si_limit
+    source: "上海市人社局《本市调整2026年度社保缴费基数上下限》"
+    locator: "正文第 1 段"
+    quote: "2026年7月1日起，本市社保缴费基数的上限调整为37731元/月，下限调整为7546元/月。本市2025年度全口径城镇单位就业人员平均工资为12577元/月。"
+    source_url: "https://rsj.sh.gov.cn/tgsgg_17341/20260818/t0035_1443203.html"
+    evidence_level: verbatim
+
+  - id: c_sh_hf
+    source: "沪公积金管委会〔2026〕3号"
+    locator: "第一条、第二条（一）（二）、第四条"
+    quote: "住房公积金缴存基数最高不超过37731元，最低不低于2740元。……单位和职工住房公积金缴存比例为各5%～7%（取整数值）。……补充住房公积金缴存比例为各1%～5%（取整数值）。……住房公积金缴存比例为各7%的，对应的住房公积金月缴存额上限为5282元。"
+    source_url: "https://www.shzfgjj.cn/html/newxxgk/zcwj/gwhwj/228478.html"
+    evidence_level: verbatim
+
+modes:
+  M1_declaration_only:
+    label: "仅社保/公积金申报表"
+    detected_when: [base_declared]
+    required_coverage: [C_SI_BASE, C_SI_SET]
+    verdict_cap: pass_with_gaps
+  M2_payroll:
+    label: "工资表（含社保公积金明细）"
+    detected_when: [gross_pay, net_pay]
+    required_coverage: [C_SI_BASE, C_SI_SET, C_HF, C_PAY_NET]
+    verdict_cap: pass
+  M3_full:
+    label: "工资表 + 个税累计列"
+    detected_when: [cum_income, cum_tax_paid]
+    required_coverage: [C_SI_BASE, C_SI_SET, C_HF, C_PAY_NET, C_IIT]
+    verdict_cap: pass
+
+coverage:
+  - {id: C_SI_BASE, title: 社保基数上下限, requires: [base_declared, city_code, period]}
+  - {id: C_SI_SET,  title: 险种齐全性,     requires: [insurance_set]}
+  - {id: C_HF,      title: 公积金基数与比例, requires: [hf_base, hf_employee_rate]}
+  - {id: C_PAY_NET, title: 应发/扣款/实发勾稽, requires: [gross_pay, net_pay]}
+  - {id: C_IIT,     title: 个税累计预扣重算, requires: [cum_income, cum_tax_paid], optional: true}
+  - {id: C_CROSS,   title: 三方人数与总额比对, requires: [sheet.social_declaration, sheet.iit_declaration], optional: true}
+  - {id: C_RETRO,   title: 7 月调基补差, requires: [prior_base, months_at_prior_base], optional: true}
+
+rules:
+  - id: r_si_01_base_below_floor
+    when:
+      all_of:
+        - {field: base_declared, op: exists}
+        - {field: base_declared, op: "<", ref: si_floor}
+        - {field: person_type, op: "not_in", value: [rehired_retiree, intern]}
+    then: {verdict: fail, severity: P0, reason_code: SI_BASE_BELOW_FLOOR, cite: [c_sh_si_limit]}
+    require_fields: [base_declared]
+    note: "上海下限 7546 = 2025 年全口径月均工资 12577 × 60%（7546.2 向下取整）。"
+
+  - id: r_si_02_base_above_ceiling_review
+    when:
+      all_of:
+        - {field: base_declared, op: ">", ref: si_ceiling}
+    then: {verdict: review, severity: P2, reason_code: SI_BASE_ABOVE_CEILING_REVIEW, cite: [c_sh_si_limit]}
+    require_fields: [base_declared]
+    note: |
+      上海养老费率引文仍为 paraphrase 级，无法判断是否已按上限封顶，只能转人工。
+      这就是证据等级在起作用：不是不会算，是不能拿不准的证据去下"你错了"的结论。
+
+  - id: r_si_08_insurance_missing
+    when:
+      all_of:
+        - {field: insurance_set, op: exists}
+        - {field: insurance_set, op: not_superset, value: [pension, unemployment, injury, medical]}
+    then: {verdict: fail, severity: P0, reason_code: SI_INSURANCE_MISSING, cite: [c_sh_si_limit]}
+    require_fields: [insurance_set]
+
+  - id: r_hf_01_rate_out_of_range
+    when:
+      all_of:
+        - {field: hf_employee_rate, op: exists}
+        - any_of:
+            - {field: hf_employee_rate, op: "<", ref: hf_rate_min}
+            - {field: hf_employee_rate, op: ">", ref: hf_rate_max}
+    then: {verdict: fail, severity: P0, reason_code: HF_RATE_OUT_OF_RANGE, cite: [c_sh_hf]}
+    impact: {expr: "round((hf_employee_rate - hf_rate_max) * min(nz(hf_base), hf_ceiling) * 2, 2)", unit: CNY/month}
+    require_fields: [hf_employee_rate]
+    note: |
+      上海上限 7%。国家条例口径的 5%~12% 在这里会把 12% 判成合规 —— 这正是必须把
+      比例区间放进参数库、不能写死常数的原因（验收用例 3）。
+
+  - id: r_hf_02_base_above_ceiling
+    when:
+      all_of:
+        - {field: hf_base, op: ">", ref: hf_ceiling}
+        - {field: abs_hf_ee_delta, op: ">", value: 1.00}
+    then: {verdict: fail, severity: P1, reason_code: HF_BASE_ABOVE_CEILING, cite: [c_sh_hf]}
+    require_fields: [hf_base, ee_hf]
+
+  - id: r_hf_04_supplementary_out_of_range
+    when:
+      all_of:
+        - {field: supp_hf_employee_rate, op: ">", ref: sup_rate_max}
+    then: {verdict: fail, severity: P1, reason_code: HF_SUPPLEMENTARY_RATE_OUT_OF_RANGE, cite: [c_sh_hf]}
+    require_fields: [supp_hf_employee_rate]
+
+  - id: r_pay_01_net_pay_mismatch
+    when:
+      all_of:
+        - {field: gross_pay, op: exists}
+        - {field: net_pay, op: exists}
+        - any_of:
+            - {field: net_delta, op: ">", value: 1.00}
+            - {field: net_delta, op: "<", value: -1.00}
+    then: {verdict: fail, severity: P0, reason_code: NET_PAY_MISMATCH, cite: [c_sh_hf]}
+    impact: {expr: "net_delta", unit: CNY/month}
+    require_fields: [gross_pay, net_pay]
+
+  - id: r_pass_all_checked
+    when:
+      all_of:
+        - {field: base_declared, op: exists}
+        - {field: base_declared, op: ">=", ref: si_floor}
+        - any_of:
+            - {field: gross_pay, op: absent}
+            - all_of:
+                - {field: net_delta, op: "<", value: 1.00}
+                - {field: net_delta, op: ">", value: -1.00}
+    then: {verdict: pass, severity: P3, reason_code: NO_DISCREPANCY_FOUND, cite: [c_sh_si_limit, c_sh_hf]}
+    require_fields: [base_declared]
+
+disabled_rules:
+  - id: r_si_03_pension_employer_mismatch
+    reason: "上海养老费率引文仍是 paraphrase 级（全国 16%/8% 未取得上海本地原文）"
+    unblock_by: "上海市人社局或上海税务的费率说明页逐字引文"
+  - id: r_si_06_medical_amount
+    reason: "上海职工医保费率未核实"
+    unblock_by: "上海市医保局官方文件"
+  - id: r_si_05_unemployment_mismatch
+    reason: "上海失业保险阶段性降费是否延续未核实"
+    unblock_by: "上海市人社局 2026 年降费通知"
+  - id: r_pay_08_below_minimum_wage
+    reason: "上海 2026 最低工资标准未核实"
+    unblock_by: "上海市人社局最低工资通知"

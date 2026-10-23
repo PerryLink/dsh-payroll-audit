@@ -1,0 +1,196 @@
+# 验收用例：5 个。每个用例都是"能被一种常见错误实现骗过"的构造。
+# 运行：python3 tools/refrun.py
+cases:
+  - id: C1
+    title: "北京 2026-07 付费基数低于下限，且不得连带误报费率错"
+    pack: packs/social-bj-2026/rulepack.yaml
+    declared_mode: M2_payroll
+    rows:
+      - employee_id: E001
+        employee_name: 张伟
+        city_code: "110000"
+        period: "2026-07"
+        person_type: regular
+        base_declared: 7000
+        gross_pay: 12000
+        employer_pension: 1120.00          # 7000 × 16%
+        employee_pension: 560.00           # 7000 × 8%
+        ee_medical: 140.00                 # 费率未核实，仅作为实发勾稽的输入
+        ee_unemployment: 35.00             # 7000 × 0.5%
+        ee_injury: 0
+        ee_hf: 840.00                      # 7000 × 12%
+        hf_base: 7000
+        hf_employer_rate: 0.12
+        hf_employee_rate: 0.12
+        insurance_set: [pension, medical, unemployment, injury]
+        iit_withheld: 0
+        other_deduction: 0
+        net_pay: 10425.00                  # 12000 - 1575
+    expect:
+      verdict: fail
+      reasons_include: [SI_BASE_BELOW_FLOOR]
+      reasons_exclude: [SI_PENSION_EMPLOYER_MISMATCH, SI_PENSION_EMPLOYEE_MISMATCH]
+      impact_approx: {SI_BASE_BELOW_FLOOR: 67.50}   # (7270-7000) × (16%+8%+2×0.5%)
+      unchecked_include: [C_IIT, C_CROSS]
+
+  - id: C2
+    title: "北京 高薪员工已按上限封顶 —— 两种错误实现都会在这里误报"
+    pack: packs/social-bj-2026/rulepack.yaml
+    declared_mode: M2_payroll
+    rows:
+      - employee_id: E002
+        employee_name: 李娜
+        city_code: "110000"
+        period: "2026-07"
+        person_type: regular
+        base_declared: 60000               # 申报列填的是实发工资，高于上限
+        gross_pay: 60000
+        employer_pension: 5815.68          # 36348 × 16%（已封顶）
+        employee_pension: 2907.84          # 36348 × 8%
+        ee_medical: 726.96
+        ee_unemployment: 181.74
+        ee_injury: 0
+        ee_hf: 4361.76                     # 36348 × 12%
+        hf_base: 60000
+        hf_employer_rate: 0.12
+        hf_employee_rate: 0.12
+        insurance_set: [pension, medical, unemployment, injury]
+        iit_withheld: 8000
+        other_deduction: 0
+        net_pay: 43821.70                  # 60000 - 8178.30 - 8000
+    expect:
+      verdict: pass
+      reasons_include: [SI_BASE_CAPPED_OK]
+      reasons_exclude: [SI_BASE_ABOVE_CEILING_UNCAPPED, SI_PENSION_EMPLOYER_MISMATCH, HF_RATE_OUT_OF_RANGE]
+
+  - id: C3
+    title: "上海公积金 12% —— 把国家条例 5%~12% 写死的实现会放过"
+    pack: packs/social-sh-2026/rulepack.yaml
+    declared_mode: M2_payroll
+    rows:
+      - employee_id: S001
+        employee_name: 王芳
+        city_code: "310000"
+        period: "2026-07"
+        person_type: regular
+        base_declared: 20000
+        gross_pay: 25000
+        employee_pension: 1600.00
+        ee_medical: 400.00
+        ee_unemployment: 100.00
+        ee_injury: 0
+        ee_hf: 2400.00                     # 20000 × 12%（上海上限 7%）
+        hf_base: 20000
+        hf_employer_rate: 0.12
+        hf_employee_rate: 0.12
+        insurance_set: [pension, medical, unemployment, injury]
+        iit_withheld: 2000
+        other_deduction: 0
+        net_pay: 18500.00
+    expect:
+      verdict: fail
+      reasons_include: [HF_RATE_OUT_OF_RANGE]
+      reasons_exclude: [SI_BASE_BELOW_FLOOR, SI_INSURANCE_MISSING]
+      impact_approx: {HF_RATE_OUT_OF_RANGE: 2000.00}   # (12%-7%) × 20000 × 2
+
+  - id: C4A
+    title: "北京 个税累计预扣少扣 12 元 —— 必须报，且不能因勾稽通过而被吞掉"
+    pack: packs/social-bj-2026/rulepack.yaml
+    declared_mode: M3_full
+    rows:
+      - employee_id: E003
+        employee_name: 赵强
+        city_code: "110000"
+        period: "2026-03"
+        person_type: regular
+        base_declared: 30000
+        gross_pay: 30000
+        employer_pension: 4800.00
+        employee_pension: 2400.00
+        ee_medical: 600.00
+        ee_unemployment: 150.00
+        ee_injury: 0
+        ee_hf: 3600.00
+        hf_base: 30000
+        hf_employer_rate: 0.12
+        hf_employee_rate: 0.12
+        insurance_set: [pension, medical, unemployment, injury]
+        iit_withheld: 892.00               # 应为 880.00
+        other_deduction: 0
+        net_pay: 22358.00                  # 30000 - 6750 - 892
+        cum_income: 90000
+        cum_exempt: 0
+        cum_basic_deduction: 15000         # 5000 × 3 个月
+        cum_special_deduction: 18000
+        cum_extra_deduction: 9000
+        cum_other_deduction: 0
+        cum_tax_paid: 1400
+    expect:
+      verdict: fail
+      reasons_include: [IIT_CUMULATIVE_MISMATCH]
+      impact_approx: {IIT_CUMULATIVE_MISMATCH: 12.00}
+
+  - id: C4B
+    title: "北京 个税差额 0.60 元 —— 在容差内，必须 pass（防误报）"
+    pack: packs/social-bj-2026/rulepack.yaml
+    declared_mode: M3_full
+    rows:
+      - employee_id: E004
+        employee_name: 赵强
+        city_code: "110000"
+        period: "2026-03"
+        person_type: regular
+        base_declared: 30000
+        gross_pay: 30000
+        employer_pension: 4800.00
+        employee_pension: 2400.00
+        ee_medical: 600.00
+        ee_unemployment: 150.00
+        ee_injury: 0
+        ee_hf: 3600.00
+        hf_base: 30000
+        hf_employer_rate: 0.12
+        hf_employee_rate: 0.12
+        insurance_set: [pension, medical, unemployment, injury]
+        iit_withheld: 880.60
+        other_deduction: 0
+        net_pay: 22369.40                  # 30000 - 6750 - 880.60
+        cum_income: 90000
+        cum_exempt: 0
+        cum_basic_deduction: 15000
+        cum_special_deduction: 18000
+        cum_extra_deduction: 9000
+        cum_other_deduction: 0
+        cum_tax_paid: 1400
+    expect:
+      verdict: pass
+      reasons_exclude: [IIT_CUMULATIVE_MISMATCH, NET_PAY_MISMATCH]
+
+  - id: C5
+    title: "只给社保申报表 —— 不得输出 pass，必须暴露未核验范围"
+    pack: packs/social-sh-2026/rulepack.yaml
+    declared_mode: M1_declaration_only
+    sheets:
+      social_declaration:
+        file: "2026年7月社保申报表.xlsx"
+        rows: 12
+    rows:
+      - employee_id: S101
+        city_code: "310000"
+        period: "2026-07"
+        person_type: regular
+        base_declared: 12000
+        insurance_set: [pension, medical, unemployment, injury]
+      - employee_id: S102
+        city_code: "310000"
+        period: "2026-07"
+        person_type: regular
+        base_declared: 7546               # 恰好等于下限，边界合规
+        insurance_set: [pension, medical, unemployment, injury]
+    expect:
+      verdict: pass_with_gaps
+      reasons_include: [NO_DISCREPANCY_FOUND]
+      reasons_exclude: [NET_PAY_MISMATCH, HF_RATE_OUT_OF_RANGE]
+      unchecked_min: 4
+      unchecked_include: [C_PAY_NET, C_IIT, C_CROSS, C_HF]
+      mode: M1_declaration_only
