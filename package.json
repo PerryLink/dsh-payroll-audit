@@ -1,6 +1,6 @@
 {
   "name": "dsh-payroll-audit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "按已核实的社保/公积金/个税参数核对工资表，逐条给出差异与依据，不代申报。",
   "type": "module",
   "main": "lib/index.mjs",
@@ -89,6 +89,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "dsh-table-ingest": "^0.2.0"
+    "dsh-table-ingest": "^0.2.1"
   }
 }
