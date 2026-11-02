@@ -3,12 +3,12 @@
     "path": "docs/assets/dsh-payroll-audit-hero.png",
     "kind": "hero",
     "alt": "dsh-payroll-audit terminal output",
-    "caption": "Real dsh-payroll-audit checker output."
+    "caption": "Real `pnpm test` run: 25/25 tests passed (2 test files)."
   },
   {
     "path": "docs/assets/dsh-payroll-audit-demo.gif",
     "kind": "demo",
     "alt": "Animated dsh-payroll-audit terminal session",
-    "caption": "The same run, assembled line by line."
+    "caption": "The same `pnpm test` run — 25/25 tests passed — assembled line by line."
   }
 ]
