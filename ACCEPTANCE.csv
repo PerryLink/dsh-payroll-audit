@@ -1,0 +1,3 @@
+req_id,metric,threshold,actual,script,evidence_sha256,pass,source,counted
+CHK-PAYROLL-AUDIT-A01,vitest 真实运行,25/25,25,npx vitest run,5103235d37f3c71e2004f7d02355266fe882976b4b8ad15de29e7f1b46f067d3,true,public/synthetic,false
+CHK-PAYROLL-AUDIT-A02,失败用例数,0,0,npx vitest run,5103235d37f3c71e2004f7d02355266fe882976b4b8ad15de29e7f1b46f067d3,true,public/synthetic,false
