@@ -1,0 +1,15 @@
+{
+  "tool": "payroll_audit",
+  "pack": "social-bj-2026 v0.1.0",
+  "city": "北京",
+  "rowCount": 3,
+  "summary": {
+    "pass": 0,
+    "pass_with_gaps": 1,
+    "review": 0,
+    "fail": 2
+  },
+  "findingCount": 2,
+  "uncheckedCount": 15,
+  "parameterGapCount": 4
+}

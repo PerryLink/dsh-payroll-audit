@@ -25,7 +25,10 @@
     "icon.svg",
     "rules",
     "CHANGELOG.md",
-    "SECURITY.md"
+    "SECURITY.md",
+    "samples",
+    "TROUBLESHOOTING.md",
+    "screenshots.json"
   ],
   "scripts": {
     "build": "tsdown",
@@ -42,6 +45,18 @@
     "manifestVersion": 1,
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "demo": {
+      "sample": "samples/quickstart/input/payroll-2026-07.csv",
+      "prompt": "用自带样例核对一张工资表，告诉我哪些人不通过、未核验项和参数缺口各有多少。",
+      "expect": "samples/quickstart/expected/result.json",
+      "screenshot": "docs/assets/quickstart.png",
+      "reads": [
+        "工资表（.csv）"
+      ],
+      "writes": [],
+      "network": false,
+      "external": []
     }
   },
   "keywords": [
