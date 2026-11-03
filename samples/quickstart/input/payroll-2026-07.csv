@@ -1,0 +1,4 @@
+employee_id,employee_name,period,person_type,insurance_set,base_declared,gross_pay,employer_pension,employee_pension,ee_unemployment,ee_medical,ee_injury,ee_hf,ee_hf_supp,hf_base,hf_employer_rate,hf_employee_rate,iit_withheld,other_deduction,net_pay
+E001,张伟,2026-07,employee,"pension,unemployment,injury,medical",8000,10000,1280,640,40,160,0,960,0,8000,0.12,0.12,0,0,8200
+E002,李娜,2026-07,employee,"pension,unemployment,injury,medical",7000,7000,1120,560,35,140,0,840,0,7000,0.12,0.12,0,0,5425
+E003,王强,2026-07,employee,"pension,unemployment,injury,medical",10000,12000,1500,800,50,200,0,1200,0,10000,0.12,0.12,0,0,9750
