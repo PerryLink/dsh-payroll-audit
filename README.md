@@ -1,8 +1,8 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dsh-payroll-audit-flow-dark.svg">
-  <img src="docs/assets/dsh-payroll-audit-flow-light.svg" width="100%" alt="dsh-payroll-audit 数据流：工资表 → dsh-table-ingest → 规则包与参数 → payroll_audit → 四态结论与引文">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dsh-payroll-audit-hero-zh-dark.webp">
+  <img src="docs/assets/dsh-payroll-audit-hero-zh-light.webp" width="100%" alt="dsh-payroll-audit 配图：左侧是插件名与价值句；右侧是一张工资表的第二行——申报基数 7,000 落在 2026-07 北京下限 7,270 之外，影响 67.50 元，下面是四态统计与未核验项">
 </picture>
 
 # dsh-payroll-audit
@@ -40,6 +40,11 @@ dsh plugin --profile <name> add dsh-payroll-audit
 结论刻意做成四态：`pass`、`pass_with_gaps`、`review`、`fail`。参数没取到的规则在规则包里就是 `disabled_rules`——不执行、但逐条列进报告，所以「没发现问题」永远不会被渲染成「合规」。参数按 `valid_from` / `valid_to` 的生效窗口解析，窗口之外的值解析为空，规则转入未核验，而不是拿旧数字下判断。
 
 它只做算术与字段一致性核对：不代申报、不替代社保经办机构核定、不判断用工关系。
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dsh-payroll-audit-flow-v5-dark.svg">
+  <img src="docs/assets/dsh-payroll-audit-flow-v5-light.svg" width="100%" alt="dsh-payroll-audit 结构图：左侧是工资表与规则包/参数两路输入，中间是 28 个派生列与 17 条规则，右侧是四态判定阶梯——未执行的规则从 pass_with_gaps 侧进入，不能到达 pass；底部是报告顺序">
+</picture>
 
 ## 三步上手
 
@@ -274,7 +279,7 @@ pnpm pack
 | `scripts/` | 自包含、锁文件、README 同步、引文四项门禁 |
 | `docs/assets/` | README 配图与演示素材 |
 
-配图由 [`scripts/gen-readme-assets.py`](scripts/gen-readme-assets.py) 程序化生成（Python，输出深/浅两版 SVG，图内只放命令 token，五语共用）。复跑：`python scripts/gen-readme-assets.py`。
+配图由 [`scripts/gen-readme-assets.py`](scripts/gen-readme-assets.py) 程序化生成（Python）：4 张 hero WebP（zh/en × 深浅）与 2 张 flow-v5 SVG，数据取自仓内规则包与样例。复跑：`python scripts/gen-readme-assets.py`。
 
 Topics：`dsh`, `dsh-plugin`, `deepseek-harness`, `deepseek`, `cordis`, `payroll`, `social`
 

@@ -1,8 +1,8 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dsh-payroll-audit-flow-dark.svg">
-  <img src="docs/assets/dsh-payroll-audit-flow-light.svg" width="100%" alt="dsh-payroll-audit डेटा प्रवाह: पेरोल शीट → dsh-table-ingest → नियम पैक और पैरामीटर → payroll_audit → चार-स्थिति निर्णय और उद्धरण">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dsh-payroll-audit-hero-en-dark.webp">
+  <img src="docs/assets/dsh-payroll-audit-hero-en-light.webp" width="100%" alt="dsh-payroll-audit: बाईं ओर प्लगइन का नाम और मूल्य पंक्तियाँ; दाईं ओर पेरोल शीट की दूसरी पंक्ति — घोषित आधार 7,000 बीजिंग 2026-07 की निचली सीमा 7,270 से नीचे है, प्रभाव 67.50 CNY/माह; नीचे चार-स्थिति गणना और असत्यापित मदें">
 </picture>
 
 # dsh-payroll-audit
@@ -40,6 +40,11 @@ dsh plugin --profile <name> add dsh-payroll-audit
 निर्णय जानबूझकर चार स्थितियों में है: `pass`, `pass_with_gaps`, `review`, `fail`। जिस नियम का पैरामीटर कभी प्राप्त नहीं हुआ, वह नियम पैक में `disabled_rules` में रहता है — चलता नहीं, पर रिपोर्ट में सूचीबद्ध रहता है, इसलिए «कोई अंतर नहीं मिला» कभी «अनुपालन» के रूप में नहीं दिखाया जाता। पैरामीटर अपनी `valid_from` / `valid_to` वैधता अवधि से हल होते हैं; अवधि के बाहर का मान खाली हल होता है, और नियम पिछले साल के आँकड़े से निर्णय लेने के बजाय अपरिप्रमाणित हो जाता है।
 
 यह केवल अंकगणित और फ़ील्ड-संगति की जाँच है: कुछ दाखिल नहीं करता, सामाजिक बीमा एजेंसी के निर्धारण का विकल्प नहीं है, और रोज़गार संबंध तय नहीं करता।
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dsh-payroll-audit-flow-v5-dark.svg">
+  <img src="docs/assets/dsh-payroll-audit-flow-v5-light.svg" width="100%" alt="dsh-payroll-audit संरचना: बाईं ओर पेरोल पंक्तियाँ और नियम पैक/पैरामीटर; बीच में 28 व्युत्पन्न कॉलम और 17 नियम; दाईं ओर चार-स्थिति निर्णय सीढ़ी, जहाँ असत्यापित चैनल pass_with_gaps में प्रवेश करता है और pass तक नहीं पहुँच सकता; नीचे रिपोर्ट क्रम">
+</picture>
 
 ## तीन चरणों में शुरुआत
 
@@ -274,7 +279,7 @@ pnpm pack
 | `scripts/` | चार गेट: self-contained, lockfile, README सिंक, उद्धरण |
 | `docs/assets/` | README चित्र और डेमो सामग्री |
 
-चित्र [`scripts/gen-readme-assets.py`](scripts/gen-readme-assets.py) से बनते हैं (Python; केवल कमांड token वाला हल्का/गहरा SVG जोड़ा, पाँचों भाषाएँ साझा करती हैं)। दोबारा चलाएँ: `python scripts/gen-readme-assets.py`.
+चित्र [`scripts/gen-readme-assets.py`](scripts/gen-readme-assets.py) से बनते हैं (Python): चार hero WebP (zh/en × हल्का/गहरा) और दो flow-v5 SVG, जो साथ आए नियम पैक और नमूने से लिए गए हैं। दोबारा चलाएँ: `python scripts/gen-readme-assets.py`.
 
 Topics: `dsh`, `dsh-plugin`, `deepseek-harness`, `deepseek`, `cordis`, `payroll`, `social`
 

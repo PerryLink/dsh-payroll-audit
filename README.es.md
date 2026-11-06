@@ -1,8 +1,8 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dsh-payroll-audit-flow-dark.svg">
-  <img src="docs/assets/dsh-payroll-audit-flow-light.svg" width="100%" alt="Flujo de datos de dsh-payroll-audit: hoja de nómina → dsh-table-ingest → paquete de reglas y parámetros → payroll_audit → veredictos de cuatro estados y citas">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dsh-payroll-audit-hero-en-dark.webp">
+  <img src="docs/assets/dsh-payroll-audit-hero-en-light.webp" width="100%" alt="dsh-payroll-audit: el nombre y las frases de valor a la izquierda; a la derecha, la fila 2 de una hoja de nómina — la base declarada de 7.000 queda por debajo del mínimo de 7.270 para Pekín 2026-07, impacto de 67,50 CNY/mes; debajo, el recuento de cuatro estados y los elementos no verificados">
 </picture>
 
 # dsh-payroll-audit
@@ -40,6 +40,11 @@ Dale una hoja de nómina (una fila por persona) y `dsh-payroll-audit` calcula en
 El veredicto es deliberadamente de cuatro estados: `pass`, `pass_with_gaps`, `review`, `fail`. Una regla cuyo parámetro nunca se obtuvo figura en `disabled_rules`: no se ejecuta, pero sigue apareciendo en el informe, así que «sin hallazgos» nunca se presenta como «cumple». Los parámetros se resuelven según su ventana `valid_from` / `valid_to`; un valor fuera de la ventana se resuelve como vacío, de modo que la regla pasa a no verificada en lugar de decidir con la cifra del año pasado.
 
 Solo comprueba aritmética y consistencia de campos: no presenta nada, no sustituye la liquidación del organismo gestor y no determina la relación laboral.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dsh-payroll-audit-flow-v5-dark.svg">
+  <img src="docs/assets/dsh-payroll-audit-flow-v5-light.svg" width="100%" alt="Estructura de dsh-payroll-audit: las filas de nómina y el paquete de reglas/parámetros entran por la izquierda; en el centro, 28 columnas derivadas y 17 reglas; a la derecha, la escalera de veredictos de cuatro estados, donde el canal no ejecutado entra en pass_with_gaps y no puede llegar a pass; el orden del informe recorre la parte inferior">
+</picture>
 
 ## Instalación en tres pasos
 
@@ -274,7 +279,7 @@ Estructura:
 | `scripts/` | Cuatro puertas: autocontenido, lockfile, sincronía de README, citas |
 | `docs/assets/` | Figuras del README y material de demostración |
 
-Las figuras las genera [`scripts/gen-readme-assets.py`](scripts/gen-readme-assets.py) (Python; par SVG claro/oscuro con solo tokens de comando, compartido por los cinco idiomas). Vuelve a ejecutarlo con `python scripts/gen-readme-assets.py`.
+Las figuras las genera [`scripts/gen-readme-assets.py`](scripts/gen-readme-assets.py) (Python): cuatro hero WebP (zh/en × claro/oscuro) y dos SVG flow-v5, a partir del paquete de reglas y la muestra incluidos. Vuelve a ejecutarlo con `python scripts/gen-readme-assets.py`.
 
 Topics: `dsh`, `dsh-plugin`, `deepseek-harness`, `deepseek`, `cordis`, `payroll`, `social`
 
