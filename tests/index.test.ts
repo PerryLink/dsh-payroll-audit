@@ -19,6 +19,7 @@ import { loadParams } from '../src/params.ts'
 import { audit, loadRulePack } from '../src/engine.ts'
 import { renderMarkdown } from '../src/report.ts'
 import { parseExpr, evaluate } from '../src/expr.ts'
+import { CITY_PROFILES } from '../src/index.ts'
 
 const HERE = import.meta.dirname
 const fixture = (name: string): string => readFileSync(join(HERE, 'fixtures', name), 'utf8')
@@ -232,5 +233,15 @@ describe('audit', () => {
         expect(outcome.citations.length, `规则 ${outcome.ruleId} 没有引文`).toBeGreaterThan(0)
       }
     }
+  })
+})
+
+
+describe('city profiles', () => {
+  it('ships Beijing and Shanghai as complete pack/params pairs', () => {
+    expect(Object.keys(CITY_PROFILES).sort()).toEqual(['bj', 'sh'])
+    expect(CITY_PROFILES.bj.params).toContain('110000')
+    expect(CITY_PROFILES.sh.params).toContain('310000')
+    expect(CITY_PROFILES.sh.rulePack).toContain('payroll-sh')
   })
 })

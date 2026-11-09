@@ -18,6 +18,14 @@ export { Config }
 /** Tool id exposed to the model, and the row id in `cordis.patch.yml`. */
 export const TOOL_NAME = 'payroll_audit'
 
+/** Built-in city profiles: the rule pack and parameter document travel together. */
+export const CITY_PROFILES = {
+  bj: { rulePack: 'rules/payroll-bj-2026.yaml', params: 'rules/params-110000.yaml' },
+  sh: { rulePack: 'rules/payroll-sh-2026.yaml', params: 'rules/params-310000.yaml' },
+} as const
+
+export type City = keyof typeof CITY_PROFILES
+
 /**
  * Resolve a package-owned file such as the rule pack.
  *
@@ -59,6 +67,7 @@ export function apply(ctx: Context, config: ConfigShape): () => void {
       parameters: {
         file: { type: 'string', description: '工资表文件绝对路径（.xlsx / .xlsm / .csv）。' },
         period: { type: 'string', description: '工资所属期，形如 2026-07。用于选择参数的生效区间。' },
+        city: { type: 'string', enum: ['bj', 'sh'], description: '选择内置城市参数包（bj=北京，sh=上海）；显式 rulePackFile/paramsFile 优先。' },
         rulePackFile: { type: 'string', description: '覆盖配置中的规则包路径（相对包根或绝对路径）。' },
         paramsFile: { type: 'string', description: '覆盖配置中的参数文件路径。' },
       },
@@ -99,8 +108,11 @@ export function apply(ctx: Context, config: ConfigShape): () => void {
         exec.signal.throwIfAborted()
         const buffer = await readFile(path)
 
-        const packPath = resolvePackageFile(args.rulePackFile?.trim() || config.rulePackFile)
-        const paramsPath = resolvePackageFile(args.paramsFile?.trim() || config.paramsFile)
+        const city = args.city as City | undefined
+        if (city !== undefined && !(city in CITY_PROFILES)) throw new Error('city 只支持 bj 或 sh')
+        const profile = city === undefined ? undefined : CITY_PROFILES[city]
+        const packPath = resolvePackageFile(args.rulePackFile?.trim() || profile?.rulePack || config.rulePackFile)
+        const paramsPath = resolvePackageFile(args.paramsFile?.trim() || profile?.params || config.paramsFile)
         const pack = loadRulePack(await readFile(packPath, 'utf8'))
 
         const ingested = ingestToTable(buffer, path)
