@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "tier": "L2-document",
+  "input_formats": [
+    "xlsx",
+    "xlsm",
+    "csv"
+  ],
+  "outputs": [
+    "markdown",
+    "json"
+  ],
+  "rules": {
+    "total": 27
+  },
+  "limits": [
+    "仅内置北京/上海参数；其他城市未取得官方费率",
+    "无真实工资表 P/R；上海包 14 条规则"
+  ]
+}
