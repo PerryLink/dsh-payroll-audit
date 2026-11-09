@@ -1,6 +1,6 @@
 # dsh-payroll-audit — Payroll audit
 
-[English](README.md) · [简体中文](README-zh.md) · [Español](README-es.md) · [Português](README-pt.md) · [हिन्दी](README-hi.md)
+[English](README.md) · [简体中文](README-zh.md)
 
 <!-- topblock:v1 -->
 > **What it is** — Checks a payroll table against verified contribution and tax parameters, with a reason for every difference.
