@@ -1,6 +1,6 @@
 {
   "name": "dsh-payroll-audit",
-  "version": "0.1.2",
+  "version": "0.1.4-reconcile.0",
   "description": "按已核实的社保/公积金/个税参数核对工资表，逐条给出差异与依据，不代申报。",
   "type": "module",
   "main": "lib/index.mjs",
@@ -17,12 +17,13 @@
     "lib",
     "cordis.patch.yml",
     "README.md",
-    "README-zh.md",
+    "README.en.md",
     "locale/*.json",
     "icon.svg",
     "rules",
     "CHANGELOG.md",
     "SECURITY.md",
+    "docs/assets/*",
     "samples",
     "TROUBLESHOOTING.md",
     "screenshots.json",
@@ -54,7 +55,11 @@
       "writes": [],
       "network": false,
       "external": []
-    }
+    },
+    "capabilities": [
+      "tools:register"
+    ],
+    "labels": []
   },
   "keywords": [
     "deepseek-harness",
