@@ -46,6 +46,11 @@ Solo comprueba aritmética y consistencia de campos: no presenta nada, no sustit
   <img src="docs/assets/dsh-payroll-audit-flow-v5-light.svg" width="100%" alt="Estructura de dsh-payroll-audit: las filas de nómina y el paquete de reglas/parámetros entran por la izquierda; en el centro, 28 columnas derivadas y 17 reglas; a la derecha, la escalera de veredictos de cuatro estados, donde el canal no ejecutado entra en pass_with_gaps y no puede llegar a pass; el orden del informe recorre la parte inferior">
 </picture>
 
+![dsh-payroll-audit: ejecución real de terminal](docs/assets/dsh-payroll-audit-demo.gif)
+
+*Repetición animada de una ejecución real registrada en este repositorio.*
+
+
 ## Instalación en tres pasos
 
 1. **Instala** (npm está publicado; los canales git y tarball son opcionales):

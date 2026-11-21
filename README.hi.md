@@ -46,6 +46,11 @@ dsh plugin --profile <name> add dsh-payroll-audit
   <img src="docs/assets/dsh-payroll-audit-flow-v5-light.svg" width="100%" alt="dsh-payroll-audit संरचना: बाईं ओर पेरोल पंक्तियाँ और नियम पैक/पैरामीटर; बीच में 28 व्युत्पन्न कॉलम और 17 नियम; दाईं ओर चार-स्थिति निर्णय सीढ़ी, जहाँ असत्यापित चैनल pass_with_gaps में प्रवेश करता है और pass तक नहीं पहुँच सकता; नीचे रिपोर्ट क्रम">
 </picture>
 
+![dsh-payroll-audit का असली टर्मिनल रन](docs/assets/dsh-payroll-audit-demo.gif)
+
+*इस रिपॉज़िटरी में दर्ज असली रन का एनिमेटेड रीप्ले।*
+
+
 ## तीन चरणों में शुरुआत
 
 1. **इंस्टॉल करें** (npm प्रकाशित है; git और tarball चैनल वैकल्पिक हैं):

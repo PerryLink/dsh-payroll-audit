@@ -46,6 +46,11 @@ It is an arithmetic and field-consistency check only: it does not file anything,
   <img src="docs/assets/dsh-payroll-audit-flow-v5-light.svg" width="100%" alt="dsh-payroll-audit structure: payroll rows and the rule pack/parameter document enter from the left; 28 derived columns and 17 rules sit in the middle; on the right a four-state verdict staircase, where the unchecked channel enters at pass_with_gaps and cannot reach pass; the report order runs along the bottom">
 </picture>
 
+![dsh-payroll-audit: real terminal run](docs/assets/dsh-payroll-audit-demo.gif)
+
+*Animated replay of a real run recorded in this repository.*
+
+
 ## Three-step setup
 
 1. **Install** (npm is published; git and tarball channels are optional):

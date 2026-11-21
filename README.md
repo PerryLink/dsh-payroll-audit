@@ -35,6 +35,10 @@ dsh plugin --profile <name> add dsh-payroll-audit
 
 ## 它是什么
 
+![dsh-payroll-audit 真实终端运行](docs/assets/dsh-payroll-audit-demo.gif)
+
+*本仓库一次真实运行的动图回放。*
+
 给它一张工资表（一人一行），`dsh-payroll-audit` 就按规则包逐行算出应缴、应扣与应发，再拿已公开的社保、公积金与个税参数逐条比对：申报基数是否落在城市上下限内、缴费金额是否等于基数乘已公布费率、应发减扣款是否等于实发、个税累计预扣是否重算得上。每条差异都带 `reason_code`、严重度、影响金额和条款引文。
 
 结论刻意做成四态：`pass`、`pass_with_gaps`、`review`、`fail`。参数没取到的规则在规则包里就是 `disabled_rules`——不执行、但逐条列进报告，所以「没发现问题」永远不会被渲染成「合规」。参数按 `valid_from` / `valid_to` 的生效窗口解析，窗口之外的值解析为空，规则转入未核验，而不是拿旧数字下判断。

@@ -46,6 +46,11 @@ Ele só confere aritmética e consistência de campos: não transmite nada, não
   <img src="docs/assets/dsh-payroll-audit-flow-v5-light.svg" width="100%" alt="Estrutura do dsh-payroll-audit: as linhas da folha e o pacote de regras/parâmetros entram pela esquerda; no centro, 28 colunas derivadas e 17 regras; à direita, a escada de veredictos de quatro estados, onde o canal não executado entra em pass_with_gaps e não pode chegar a pass; a ordem do relatório percorre a parte inferior">
 </picture>
 
+![dsh-payroll-audit: execução real de terminal](docs/assets/dsh-payroll-audit-demo.gif)
+
+*Repetição animada de uma execução real registrada neste repositório.*
+
+
 ## Instalação em três passos
 
 1. **Instale** (o npm está publicado; os canais git e tarball são opcionais):
