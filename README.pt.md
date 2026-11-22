@@ -11,6 +11,8 @@
 
 Um plugin de auditoria de folha de pagamento para o DeepSeek Harness, feito para folha, RH e finanças: você entrega uma folha e ele confere em cada linha a base de contribuição, as alíquotas, a cobertura de seguros, a conta bruto-líquido e a retenção acumulada. Parâmetro que nunca foi obtido é reportado como não verificado: «não conferido» nunca é apresentado como «em conformidade».
 
+Última verificação: DeepSeek Harness `dsh-v0.2.3-alpha.1` (2026-11-22).
+
 [Instalar](#instalação-em-três-passos) · [Configuração](#configuração) · [FAQ](#faq) · [简体中文](README.md) · [English](README.en.md) · [Español](README.es.md) · [Português](README.pt.md) · [हिन्दी](README.hi.md)
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-3366CC?style=flat-square&labelColor=2B3245)](LICENSE)
@@ -49,7 +51,6 @@ Ele só confere aritmética e consistência de campos: não transmite nada, não
 ![dsh-payroll-audit: execução real de terminal](docs/assets/dsh-payroll-audit-demo.gif)
 
 *Repetição animada de uma execução real registrada neste repositório.*
-
 
 ## Instalação em três passos
 

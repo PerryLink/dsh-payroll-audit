@@ -11,6 +11,8 @@
 
 DeepSeek Harness के लिए पेरोल ऑडिट प्लगइन, पेरोल, मानव संसाधन और वित्त के लिए: एक पेरोल शीट दें और यह हर पंक्ति में योगदान आधार, दरें, बीमा कवरेज, सकल-से-शुद्ध गणना और संचयी रोक जाँचता है। जो पैरामीटर कभी प्राप्त नहीं हुआ, उसे अपरिप्रमाणित बताया जाता है — «जाँचा नहीं गया» को कभी «अनुपालन» नहीं कहा जाता।
 
+अंतिम सत्यापन: DeepSeek Harness `dsh-v0.2.3-alpha.1` (2026-11-22).
+
 [इंस्टॉल](#तीन-चरणों-में-शुरुआत) · [कॉन्फ़िगरेशन](#कॉन्फ़िगरेशन) · [FAQ](#faq) · [简体中文](README.md) · [English](README.en.md) · [Español](README.es.md) · [Português](README.pt.md) · [हिन्दी](README.hi.md)
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-3366CC?style=flat-square&labelColor=2B3245)](LICENSE)
@@ -49,7 +51,6 @@ dsh plugin --profile <name> add dsh-payroll-audit
 ![dsh-payroll-audit का असली टर्मिनल रन](docs/assets/dsh-payroll-audit-demo.gif)
 
 *इस रिपॉज़िटरी में दर्ज असली रन का एनिमेटेड रीप्ले।*
-
 
 ## तीन चरणों में शुरुआत
 

@@ -11,6 +11,8 @@
 
 面向 DeepSeek Harness 的算薪核对插件，给薪酬、人事与财务用：读一张工资表，逐行核对缴费基数、费率、险种、应发实发勾稽与个税累计预扣；参数没取到就明确标为未核验，绝不把「没查」写成「合规」。
 
+最近一次核验：DeepSeek Harness `dsh-v0.2.3-alpha.1`（2026-11-22）。
+
 [安装](#三步上手) · [配置](#配置) · [FAQ](#faq) · [简体中文](README.md) · [English](README.en.md) · [Español](README.es.md) · [Português](README.pt.md) · [हिन्दी](README.hi.md)
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-3366CC?style=flat-square&labelColor=2B3245)](LICENSE)
