@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Payroll audit",
-    "description": "按已核实的社保/公积金/个税参数核对工资表，逐条给出差异与依据，不代申报。"
+    "description": "Check a payroll sheet line by line against published social-insurance, housing-fund and income-tax parameters — every difference with its reason, clause and amount."
   }
 }

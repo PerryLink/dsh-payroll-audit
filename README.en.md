@@ -7,6 +7,8 @@
 
 # dsh-payroll-audit
 
+Current version `0.1.6`.
+
 **Check a payroll sheet line by line against published social-insurance, housing-fund and income-tax parameters — every difference with its reason, clause and amount.**
 
 A payroll-audit plugin for DeepSeek Harness, made for payroll, HR and finance: give it a payroll sheet and it checks each row's contribution base, rates, scheme coverage, gross-to-net arithmetic and cumulative withholding. A parameter that was never obtained is reported as unchecked — "not checked" is never rendered as "compliant".
